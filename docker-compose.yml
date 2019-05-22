@@ -1,0 +1,111 @@
+---
+version: "3"
+
+services:
+  nginx:
+    container_name: nginx
+    image: jwilder/nginx-proxy
+    network_mode: host
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - /etc/localtime:/etc/localtime:ro
+      - ./nginx/nginx.tmpl:/app/nginx.tmpl
+      - ./nginx/certs:/etc/nginx/certs
+      - ./nginx/certs:/etc/nginx/dhparam
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./nginx/vhost.d:/etc/nginx/vhost.d
+      - ./nginx/html:/usr/share/nginx/html
+    labels:
+      com.github.jrcs.letsencrypt_nginx_proxy_companion.nginx_proxy: "true"
+    restart: unless-stopped
+
+  letsencrypt:
+    container_name: letsencrypt
+    image: jrcs/letsencrypt-nginx-proxy-companion
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /etc/localtime:/etc/localtime:ro
+      - ./nginx/certs:/etc/nginx/certs
+      - ./nginx/certs:/etc/nginx/dhparam
+      - ./nginx/vhost.d:/etc/nginx/vhost.d
+      - ./nginx/html:/usr/share/nginx/html
+    depends_on:
+      - nginx
+    restart: unless-stopped
+
+  cloudflare:
+    container_name: cloudflare
+    image: tiredofit/nginx-proxy-cloudflare-companion
+    environment:
+      CF_TOKEN: "${CF_TOKEN}"
+      CF_EMAIL: "${CF_EMAIL}"
+      TARGET_DOMAIN: "${CF_TARGET}"
+      DOMAIN1: "${CF_DOMAIN}"
+      DOMAIN1_ZONE_ID: "${CF_ZONE_ID}"
+      DOMAIN1_PROXIED: "true"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /etc/localtime:/etc/localtime:ro
+    depends_on:
+      - nginx
+    restart: unless-stopped
+
+  portainer:
+    container_name: portainer
+    image: portainer/portainer
+    environment:
+      # dockergen
+      VIRTUAL_HOST: "portainer.${CF_DOMAIN}"
+      VIRTUAL_PORT: 9000
+      # nginx-proxy-letsencrypt
+      LETSENCRYPT_HOST: "portainer.${CF_DOMAIN}"
+      LETSENCRYPT_EMAIL: "${LETSENCRYPT_EMAIL}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /etc/localtime:/etc/localtime:ro
+      - ./portainer:/data
+    restart: unless-stopped
+
+  jenkins:
+    container_name: jenkins
+    image: jenkins/jenkins:lts
+    user: root
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        if ! which docker >/dev/null; then
+          echo "Installing docker-cli ..." >&2
+          {
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update -qq
+            apt-get install -qqy apt-transport-https
+            curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add -
+            echo "deb [arch=amd64] https://download.docker.com/linux/debian $$(sed -nE 's/^VERSION=.*\((.+)\).*/\1/p' /etc/os-release) stable" > /etc/apt/sources.list.d/docker.list
+            apt-get update -qq
+            apt-get install -qqy docker-ce docker-compose
+            rm -rf /var/lib/apt/lists/*
+            unset DEBIAN_FRONTEND
+            adduser jenkins docker >/dev/null
+          } \
+            >/dev/null
+        fi
+
+        exec su jenkins -c /usr/local/bin/jenkins.sh "$$@"
+    ports:
+      - 50000:50000
+    environment:
+      # dockergen
+      VIRTUAL_HOST: "jenkins.${CF_DOMAIN}"
+      VIRTUAL_PORT: 8080
+      # nginx-proxy-letsencrypt
+      LETSENCRYPT_HOST: "jenkins.${CF_DOMAIN}"
+      LETSENCRYPT_EMAIL: "${LETSENCRYPT_EMAIL}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /etc/localtime:/etc/localtime:ro
+      - ./jenkins:/var/jenkins_home
+    restart: unless-stopped

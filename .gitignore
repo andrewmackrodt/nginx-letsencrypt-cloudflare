@@ -1,0 +1,7 @@
+/jenkins
+/nginx/certs
+/nginx/conf.d/default.conf
+/nginx/vhost.d/default
+/portainer
+/.env
+/!.env.*
