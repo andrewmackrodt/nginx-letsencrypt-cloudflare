@@ -1,10 +1,18 @@
 ---
-version: "3"
+version: "2.3"
+
+x-logging:
+  &default-logging
+  options:
+    max-size: "100k"
+    max-file: "5"
+  driver: json-file
 
 services:
   nginx:
     container_name: nginx
     image: jwilder/nginx-proxy
+    logging: *default-logging
     network_mode: host
     ports:
       - 80:80
@@ -25,6 +33,7 @@ services:
   letsencrypt:
     container_name: letsencrypt
     image: jrcs/letsencrypt-nginx-proxy-companion
+    logging: *default-logging
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /etc/localtime:/etc/localtime:ro
@@ -39,6 +48,7 @@ services:
   cloudflare:
     container_name: cloudflare
     image: tiredofit/nginx-proxy-cloudflare-companion
+    logging: *default-logging
     environment:
       CF_TOKEN: "${CF_TOKEN}"
       CF_EMAIL: "${CF_EMAIL}"
@@ -56,6 +66,7 @@ services:
   portainer:
     container_name: portainer
     image: portainer/portainer
+    logging: *default-logging
     environment:
       # dockergen
       VIRTUAL_HOST: "portainer.${CF_DOMAIN}"
@@ -72,6 +83,7 @@ services:
   jenkins:
     container_name: jenkins
     image: jenkins/jenkins:lts
+    logging: *default-logging
     user: root
     entrypoint:
       - /bin/sh
