@@ -83,6 +83,7 @@ services:
   jenkins:
     container_name: jenkins
     image: jenkins/jenkins:lts
+    init: true
     logging: *default-logging
     user: root
     entrypoint:
