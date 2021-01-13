@@ -201,6 +201,7 @@ server {
 	access_log /proc/self/fd/1 vhost;
 
 	{{ if eq $https_method "redirect" }}
+		set $redirect_http "";
 		# redirect non-https requests to https site
 		# ignore if connection to proxy was secure
 		if ( $proxy_x_forwarded_proto !~ ^https ) {

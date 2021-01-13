@@ -65,7 +65,7 @@ services:
 
   portainer:
     container_name: portainer
-    image: portainer/portainer
+    image: portainer/portainer-ce
     logging: *default-logging
     environment:
       # dockergen
@@ -93,16 +93,19 @@ services:
         if ! which docker >/dev/null; then
           echo "Installing docker-cli ..." >&2
           {
+            groupadd -g 998 docker >/dev/null
+            adduser jenkins docker >/dev/null
             export DEBIAN_FRONTEND=noninteractive
             apt-get update -qq
             apt-get install -qqy apt-transport-https
             curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add -
             echo "deb [arch=amd64] https://download.docker.com/linux/debian $$(sed -nE 's/^VERSION=.*\((.+)\).*/\1/p' /etc/os-release) stable" > /etc/apt/sources.list.d/docker.list
             apt-get update -qq
-            apt-get install -qqy docker-ce docker-compose
+            apt-get install -qqy docker-ce
             rm -rf /var/lib/apt/lists/*
             unset DEBIAN_FRONTEND
-            adduser jenkins docker >/dev/null
+            curl -L "https://github.com/docker/compose/releases/download/1.27.4/docker-compose-$$(uname -s)-$$(uname -m)" -o /usr/local/bin/docker-compose
+            chmod +x /usr/local/bin/docker-compose
           } \
             >/dev/null
         fi
